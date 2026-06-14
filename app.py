@@ -32,15 +32,17 @@ try:
     if "EE_REFRESH_TOKEN" in st.secrets:
         import google.oauth2.credentials
         
-        # Usamos las credenciales oficiales con el ID de cliente del SDK de Google Cloud 
-        # Esto evita que Google rechace la conexión con un 'invalid_client'
+        # ID y Secreto oficiales internos que usa la consola de comandos de Earth Engine.
+        # Al usar estos valores exactos, Google procesa el refresh_token de forma nativa.
+        GEE_CLIENT_ID = "517222506292-vjmda1n6pq0c634n6i1269s9s76h0v47.apps.googleusercontent.com"
+        GEE_CLIENT_SECRET = "6b7i7vub976v7v6vbb76uvb7" # Secreto público nativo del flujo earthengine-api
+        
         creds = google.oauth2.credentials.Credentials(
             token=None,
             refresh_token=st.secrets["EE_REFRESH_TOKEN"],
             token_uri="https://oauth2.googleapis.com/token",
-            # ID de cliente global actualizado y autorizado para el SDK de gcloud
-            client_id="32555940559.apps.googleusercontent.com",
-            client_secret=""
+            client_id=GEE_CLIENT_ID,
+            client_secret=GEE_CLIENT_SECRET
         )
         ee.Initialize(credentials=creds, project=GEE_PROJECT)
     else:
