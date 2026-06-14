@@ -25,12 +25,28 @@ from vortex_core.ingestor_vec import VectorIngestor
 from vortex_core.weather_service import WeatherService
 from vortex_core.analisis_sat import SatelliteAnalyzer
 
-# Inicialización segura de Google Earth Engine
+# ==============================================================================
+# INICIALIZACIÓN SEGURA DE GOOGLE EARTH ENGINE (Soporte OAuth / Secrets)
+# ==============================================================================
 try:
+    # 1. Intentamos inicializar asumiendo que las credenciales ya están inyectadas de forma global
     ee.Initialize(project=GEE_PROJECT)
-except Exception:
-    ee.Authenticate()
-    ee.Initialize(project=GEE_PROJECT)
+except Exception as e_init:
+    try:
+        # 2. Si falla, intentamos reconstruir las credenciales usando los secrets de Streamlit
+        # Esto evita disparar ee.Authenticate() que rompe el entorno de producción
+        if "EARTHENGINE_TOKEN" in st.secrets:
+            # Alternativa si guardas un token persistente de larga duración
+            import google.oauth2.credentials
+            creds = google.oauth2.credentials.Credentials(st.secrets["EARTHENGINE_TOKEN"])
+            ee.Initialize(credentials=creds, project=GEE_PROJECT)
+        else:
+            # Si no hay token guardado, forzamos inicialización limpia con el ID del proyecto.
+            # Asegúrate en tu consola de Google Cloud que tu cuenta tiene el rol de "Earth Engine Resource Viewer/Writer".
+            ee.Initialize(project=GEE_PROJECT)
+    except Exception as e_final:
+        st.error(f"Error crítico al conectar con Google Earth Engine: {str(e_final)}")
+        st.info("💡 Consejo: Asegúrate de que la API de Earth Engine esté habilitada en tu consola de Google Cloud para este proyecto.")
 
 try:
     # Vinculado con tu configuración de secrets.toml
