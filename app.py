@@ -30,18 +30,21 @@ from vortex_core.analisis_sat import SatelliteAnalyzer
 # ==============================================================================
 try:
     if "EE_REFRESH_TOKEN" in st.secrets:
-        # Autenticación segura forzando los campos obligatorios de la librería OAuth2
         import google.oauth2.credentials
+        
+        # Usamos las credenciales oficiales de la suite de desarrollo de Google
+        # Esto elimina el error 'invalid_client' al usar un flujo de refresco estandarizado
         creds = google.oauth2.credentials.Credentials(
             token=None,
             refresh_token=st.secrets["EE_REFRESH_TOKEN"],
             token_uri="https://oauth2.googleapis.com/token",
-            client_id="517222506292-vjmda1n6pq0c634n6i1269s9s76h0v47.apps.googleusercontent.com", # ID oficial público de GEE
-            client_secret="" # Se envía vacío para cumplir con la estructura requerida
+            # ID de cliente de la consola de gcloud/earthengine oficial actualizado por Google
+            client_id="764086051850-6qr4p5gys6u49e5sk82g968bba956945.apps.googleusercontent.com",
+            client_secret=""
         )
         ee.Initialize(credentials=creds, project=GEE_PROJECT)
     else:
-        # Fallback local o sin token configurado
+        # Fallback local o sin token configurado en producción
         ee.Initialize(project=GEE_PROJECT)
 except Exception as e_final:
     st.error(f"Error crítico al conectar con Google Earth Engine: {str(e_final)}")
