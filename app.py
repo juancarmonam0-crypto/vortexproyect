@@ -30,14 +30,14 @@ from vortex_core.analisis_sat import SatelliteAnalyzer
 # ==============================================================================
 try:
     if "EE_REFRESH_TOKEN" in st.secrets:
-        # Autenticación segura usando el token de refresco (sin archivos JSON)
+        # Autenticación segura forzando los campos obligatorios de la librería OAuth2
         import google.oauth2.credentials
         creds = google.oauth2.credentials.Credentials(
-            None,
+            token=None,
             refresh_token=st.secrets["EE_REFRESH_TOKEN"],
             token_uri="https://oauth2.googleapis.com/token",
-            client_id="517222506292-vjmda1n6pq0c634n6i1269s9s76h0v47.apps.googleusercontent.com",
-            client_secret=None
+            client_id="517222506292-vjmda1n6pq0c634n6i1269s9s76h0v47.apps.googleusercontent.com", # ID oficial público de GEE
+            client_secret="" # Se envía vacío para cumplir con la estructura requerida
         )
         ee.Initialize(credentials=creds, project=GEE_PROJECT)
     else:
