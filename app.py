@@ -1,3 +1,14 @@
+import sys
+import os
+
+# ==============================================================================
+# INYECCIÓN DINÁMICA DE RUTAS (Soporte Estructura Streamlit Cloud)
+# Esto obliga a Python a encontrar ai_core y vortex_core sin importar dónde se ejecute
+# ==============================================================================
+ruta_actual = os.path.dirname(os.path.abspath(__file__))
+if ruta_actual not in sys.path:
+    sys.path.append(ruta_actual)
+
 import streamlit as st
 from streamlit_folium import st_folium
 import ee
@@ -6,7 +17,7 @@ import plotly.express as px
 from config import GEE_PROJECT
 import importlib
 
-# Módulos de control, mapeo e interfaz estables
+# Módulos de control, mapeo e interfaz estables (Ahora detectados correctamente)
 import map_engine
 import vortex_ui
 from historial_manager import HistorialManager
@@ -22,11 +33,12 @@ except Exception:
     ee.Initialize(project=GEE_PROJECT)
 
 try:
+    # Vinculado con tu configuración de secrets.toml
     weather_api_key = st.secrets["WEATHER_API_KEY"]
     weather_engine = WeatherService(api_key=weather_api_key)
 except Exception as e:
     st.error("No se encontró la clave de API climática. Verifica tus secretos.")
-    weather_engine = None # O maneja el error según tu lógica
+    weather_engine = None 
     
 st.set_page_config(page_title="Vortex 2.0", layout="wide")
 st.title("🛰️ Vortex 2.0")
@@ -57,11 +69,10 @@ with tab_monitoreo:
         area_ha = VectorIngestor.get_area_hectares(coords)
         rango_fechas = ('2026-01-01', '2026-12-31')
 
-        # === CAMBIO APLICADO: Guardado en sesión para persistencia ===
+        # Guardado en sesión para persistencia
         st.session_state["roi"] = roi
         st.session_state["current_coords"] = coords
         st.session_state["current_area"] = area_ha
-        # ===========================================================
 
         # A. Visualizador de la Capa Activa (Derecha)
         with col_capa:
@@ -78,7 +89,6 @@ with tab_monitoreo:
                     img_url = SatelliteAnalyzer.get_index_url(roi, rango_fechas, selected_layer)
                 else:
                     from vortex_core.ingestor_sat_radar import SatelliteIngestorRadar
-                    # CORRECCIÓN DE BANDAS: Enviamos el formato exacto que espera el backend
                     banda_radar = "VV_dB" if "VV" in selected_layer else "VH_dB"
                     img_url = SatelliteIngestorRadar.get_radar_url(roi, rango_fechas, banda_radar)
             
@@ -101,7 +111,6 @@ with tab_monitoreo:
         with st.spinner("Calculando estadísticas biofísicas de la escena..."):
             resultados_metrica = {}
             
-            # Llamado modular al generador del cubo óptico
             try:
                 cube = SatelliteAnalyzer.prepare_dataset(SatelliteAnalyzer.get_sentinel_2(roi, rango_fechas))
             except Exception:
@@ -115,7 +124,6 @@ with tab_monitoreo:
 
             reducer_combi = ee.Reducer.mean().combine(reducer2=ee.Reducer.stdDev(), sharedInputs=True)
 
-            # Reducción de regiones unificada
             for nombre, banda_key in capas.items():
                 if "Radar" not in nombre and cube is not None:
                     try:
@@ -150,7 +158,7 @@ with tab_monitoreo:
                     delta_color="gray"
                 )
 
-        # C. Análisis Histórico (Suavizado y marcas corregidas)
+        # C. Análisis Histórico
         st.markdown("---")
         st.markdown("### 📈 Análisis Cronológico Avanzado")
         btn_hist = st.button("📊 Generar Análisis Histórico Multicapa", use_container_width=True)
@@ -175,10 +183,8 @@ with tab_monitoreo:
                 df["Estado"] = "Dato Clean"
                 
                 if len(df) > 3:
-                    # Generamos el suavizado por mediana móvil
                     rolling_median = df["Valor"].rolling(window=3, center=True, min_periods=1).median()
                     
-                    # Identificación matemática de anomalías según tipo de capa
                     if "Radar" not in capa_grafico:
                         if capa_grafico == "MSI":
                             anomalos = (df["Valor"] > (rolling_median * 1.20))
@@ -189,16 +195,11 @@ with tab_monitoreo:
                     else:
                         anomalos = (df["Valor"] - rolling_median).abs() > 1.8
                     
-                    # Marcamos el estado ruidoso para las X rojas
                     df.loc[anomalos, "Estado"] = "Ruido/Nube Detectada"
-                    
-                    # GARANTÍA DE SUAVIZADO: Toda la línea principal pasa a tomar el valor de la mediana suavizada
                     df["Valor"] = rolling_median
 
-                # El gráfico principal de líneas renderiza SIEMPRE los valores suavizados y limpios
                 fig = px.line(df, x="Fecha", y="Valor", title=f"Evolución Histórica Dinámica (Suavizada): {capa_grafico}", markers=True) 
                 
-                # Se clavan las "X" rojas mapeando el Valor Original ruidoso donde se detectó la interferencia
                 if df["Estado"].str.contains("Ruido/Nube Detectada").any():
                     df_anomalos = df[df["Estado"] == "Ruido/Nube Detectada"]
                     fig.add_scatter(
@@ -224,18 +225,14 @@ with tab_monitoreo:
             st.info("👈 Esperando que dibujes un polígono en el mapa base para inicializar el visualizador satelital.")
         st.info("👈 Dibuja un polígono en el mapa superior para iniciar el pipeline de análisis computacional.")
 
-# En app.py
-
-# Importa solo los módulos necesarios una vez al inicio del archivo
+# Importaciones para el tab de IA
 from ai_core import diagnostic, context_manager 
 
 with tab_ia:
-    # Verificación simple de que el ROI existe
     if 'roi' in st.session_state:
         vortex_ui.render_ai_chat_tab(
             api_configurada=diagnostic.client is not None,
             system_prompt=diagnostic.SYSTEM_PROMPT,
-            # Se delega la preparación al orquestador
             obtener_contexto_fn=lambda: context_manager.preparar_contexto_para_ia(st.session_state.roi)
         )
     else:
