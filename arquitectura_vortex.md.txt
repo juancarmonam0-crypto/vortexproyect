@@ -1,0 +1,72 @@
+# Arquitectura Técnica: Vortex Project 2.0
+
+## Resumen del Sistema
+Vortex 2.0 es un motor de análisis geoespacial modular diseñado para el diagnóstico agrícola y cálculo de variables biofísicas mediante la fusión de datos satelitales ópticos (Sentinel-2) y de radar (Sentinel-1) sobre Google Earth Engine (GEE), utilizando Streamlit como capa de orquestación y UI.
+
+## Estructura de Módulos (Core Backend)
+
+### 1. `vortex_core/ingestor_sat.py`
+**Responsabilidad:** Interfaz y extracción de datos ópticos de Sentinel-2 desde GEE.
+* **Funciones clave:**
+    * `get_sentinel_2(geometry, date_range)`: Filtra colecciones por geometría, rango de fechas y nubosidad (<20%), aplicando el factor de escala de reflectancia ($1/10000$).
+    * `get_index_url(roi, date_range, band_name)`: Genera una URL de miniatura PNG geo-referenciada optimizada para la visualización de índices ópticos en la UI.
+
+### 2. `vortex_core/ingestor_sat_radar.py`
+**Responsabilidad:** Ingesta especializada de datos de Radar de Apertura Sintética (SAR) de Sentinel-1.
+* **Funciones clave:**
+    * `get_sentinel_1(geometry, date_range)`: Filtra colecciones SAR GRD en modo de adquisición Interferometric Wide (IW) generando un compuesto de mediana espacial para mitigar el ruido de *speckle*.
+    * `get_radar_url(roi, date_range, band_name)`: Genera la URL de miniatura PNG aplicando contrastes dinámicos según el comportamiento físico de la banda (VH o VV) y enmascaramiento de fondo (`unmask(-30)`).
+
+### 3. `vortex_core/analisis_sat.py`
+**Responsabilidad:** Procesamiento analítico y cálculo de índices espectrales ópticos.
+* **Funciones clave:**
+    * `add_indices(image)`: Agrega bandas calculadas al vuelo: NDVI, NDRE, NDWI y MSI.
+    * `get_mean_value(image, geometry, band_name)`: Reduce la región mediante `ee.Reducer.mean()` a una resolución de 10m para métricas estadísticas.
+    * `get_variability_index(image, geometry, band_name)`: Calcula la desviación estándar espacial (`ee.Reducer.stdDev()`) para evaluar heterogeneidad.
+
+### 4. `vortex_core/analisis_sat_radar.py`
+**Responsabilidad:** Acondicionamiento y escalado de señales SAR.
+* **Funciones clave:**
+    * `process_radar(sar_img)`: Selecciona polarizaciones (`VV`, `VH`) nativas en dB, renombra variables al estándar del sistema y aplica un recorte de seguridad (`clamp(-30, 0)`) para remover picos aberrantes.
+
+### 5. `vortex_core/ingestor_vec.py` & `weather_service.py`
+**Responsabilidad:** Operaciones vectoriales espaciales e ingesta de datos meteorológicos exógenos a GEE.
+
+---
+
+## Módulos de Orquestación y Capa de UI
+
+### 6. `pipeline_manager.py` (¡Nuevo Módulo Crítico!)
+**Responsabilidad:** Actúa como controlador de datos pesado e intermediario (*Middleware*) entre el backend geoespacial y la interfaz de usuario.
+* **Funciones clave:**
+    * `get_layer_url(...)`: Determina de forma automatizada e inteligente si invocar el ingestor óptico o el ingestor de radar para retornar la URL correspondiente.
+    * `calculate_metrics(...)`: Coordina la ejecución simultánea de los pipelines ópticos y de radar. Aplica un formateo estricto para forzar retornos flotantes válidos (`float`), evitando de forma segura valores nulos (`NoneType`) que quiebren las máscaras de la UI.
+
+### 7. `historial_manager.py`
+**Responsabilidad:** Motor analítico temporal histórico.
+* **Funciones clave:**
+    * `get_time_series(roi, tipo, banda)`: Método maestro unificado que itera mes a mes de forma retrospectiva por los últimos 24 meses, segmentando consultas ópticas (con ordenamiento por mínima nubosidad) y de radar para estructurar colecciones temporales homogéneas.
+
+### 8. `map_engine.py` & `vortex_ui.py`
+**Responsabilidad:** Renderizado y desacoplamiento de componentes web.
+* `map_engine`: Entrega un mapa base interactivo `folium` con herramientas de dibujo vectorial (`Draw`) inyectadas.
+* `vortex_ui`: Módulo de renderizado de widgets nativos de Streamlit: cuadrícula de métricas multivariables, inyección de previsualizaciones de imágenes satelitales y despliegue de gráficas cronológicas.
+
+### 9. `app.py` (Orquestador Principal)
+**Responsabilidad:** Archivo raíz y punto de entrada de la aplicación web. Se encuentra **completamente limpio de funciones (`def`) internas**. Funciona de forma reactiva y pura manejando el ciclo de vida de Streamlit, capturando los trazos vectoriales del usuario y enviando los flujos a los gestores correspondientes.
+
+10. ai_core/ (Módulo Central de IA)
+Responsabilidad: Motor de diagnóstico agronómico inteligente y multimodal. Reemplaza cualquier implementación legacy anterior.
+
+Estructura Interna:
+
+diagnostic.py: Configuración y Cliente. Responsable de inicializar el cliente gemini-2.5-flash, gestionar la autenticación (Secrets/Env) y definir el SYSTEM_PROMPT profesional del agrónomo. Es el único punto de contacto con la configuración del modelo.
+
+prep.py: Preparación de Datos (Middleware Espacial). Transforma los datos crudos del session_state (coordenadas, métricas estadísticas, área) en un contexto estructurado en lenguaje natural listo para ser consumido por el modelo.
+
+engine.py: Ejecutor Central. Orquesta la comunicación final con la API. Implementa la lógica multimodal capaz de recibir texto y binarios de imágenes (capas satelitales) para diagnósticos visuales geolocalizados.
+
+Ventaja Arquitectónica: Al encapsular esta lógica, app.py queda totalmente libre de funciones de IA, delegando toda la complejidad analítica a este paquete. Se logra una separación total entre la lógica de interfaz (Streamlit) y la inteligencia de diagnóstico.
+---
+
+## Flujo de Datos Actualizado (Pipeline Secuencial)

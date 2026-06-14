@@ -1,0 +1,10 @@
+streamlit==1.58.0
+streamlit-folium
+earthengine-api
+pandas
+plotly
+google-generativeai
+google-cloud-storage
+google-auth
+folium
+requests
