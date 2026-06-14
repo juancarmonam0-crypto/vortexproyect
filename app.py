@@ -26,23 +26,23 @@ from vortex_core.weather_service import WeatherService
 from vortex_core.analisis_sat import SatelliteAnalyzer
 
 # ==============================================================================
-# INICIALIZACIÓN SEGURA DE GOOGLE EARTH ENGINE (Soporte OAuth / Secrets)
+# INICIALIZACIÓN SEGURA DE GOOGLE EARTH ENGINE (Soporte OAuth / Secrets Propios)
 # ==============================================================================
 try:
-    if "EE_REFRESH_TOKEN" in st.secrets:
-        import google.oauth2.credentials
+    if "EE_REFRESH_TOKEN" in st.secrets and "GOOGLE_CLIENT_ID" in st.secrets and "GOOGLE_CLIENT_SECRET" in st.secrets:
+        from google.oauth2.credentials import Credentials
         
-        # ID y Secreto oficiales internos que usa la consola de comandos de Earth Engine.
-        # Al usar estos valores exactos, Google procesa el refresh_token de forma nativa.
-        GEE_CLIENT_ID = "517222506292-vjmda1n6pq0c634n6i1269s9s76h0v47.apps.googleusercontent.com"
-        GEE_CLIENT_SECRET = "6b7i7vub976v7v6vbb76uvb7" # Secreto público nativo del flujo earthengine-api
-        
-        creds = google.oauth2.credentials.Credentials(
+        # Autenticación robusta y definitiva usando tus propias credenciales Web/Escritorio OAuth2
+        creds = Credentials(
             token=None,
             refresh_token=st.secrets["EE_REFRESH_TOKEN"],
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=GEE_CLIENT_ID,
-            client_secret=GEE_CLIENT_SECRET
+            client_id=st.secrets["GOOGLE_CLIENT_ID"],
+            client_secret=st.secrets["GOOGLE_CLIENT_SECRET"],
+            scopes=[
+                "https://www.googleapis.com/auth/earthengine",
+                "https://www.googleapis.com/auth/cloud-platform"
+            ]
         )
         ee.Initialize(credentials=creds, project=GEE_PROJECT)
     else:
