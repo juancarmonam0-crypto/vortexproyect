@@ -3,7 +3,7 @@ streamlit-folium
 earthengine-api
 pandas
 plotly
-google-generativeai
+google-genai
 google-cloud-storage
 google-auth
 folium
