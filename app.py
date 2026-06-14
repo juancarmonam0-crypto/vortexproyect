@@ -32,14 +32,14 @@ try:
     if "EE_REFRESH_TOKEN" in st.secrets:
         import google.oauth2.credentials
         
-        # Usamos las credenciales oficiales de la suite de desarrollo de Google
-        # Esto elimina el error 'invalid_client' al usar un flujo de refresco estandarizado
+        # Usamos las credenciales oficiales con el ID de cliente del SDK de Google Cloud 
+        # Esto evita que Google rechace la conexión con un 'invalid_client'
         creds = google.oauth2.credentials.Credentials(
             token=None,
             refresh_token=st.secrets["EE_REFRESH_TOKEN"],
             token_uri="https://oauth2.googleapis.com/token",
-            # ID de cliente de la consola de gcloud/earthengine oficial actualizado por Google
-            client_id="764086051850-6qr4p5gys6u49e5sk82g968bba956945.apps.googleusercontent.com",
+            # ID de cliente global actualizado y autorizado para el SDK de gcloud
+            client_id="32555940559.apps.googleusercontent.com",
             client_secret=""
         )
         ee.Initialize(credentials=creds, project=GEE_PROJECT)
@@ -49,7 +49,7 @@ try:
 except Exception as e_final:
     st.error(f"Error crítico al conectar con Google Earth Engine: {str(e_final)}")
     st.info("💡 Consejo: Asegúrate de que la API de Earth Engine esté habilitada en tu consola de Google Cloud para este proyecto.")
-
+    
 try:
     # Vinculado con tu configuración de secrets.toml
     weather_api_key = st.secrets["WEATHER_API_KEY"]
